@@ -21,7 +21,33 @@ docker compose -p k6 -f b/b1-compose/docker-compose.yml exec attacker wget -qO- 
 docker compose -p k6 -f b/b1-compose/docker-compose.yml down -v
 ```
 
-Hasil: file `laporan-k6.txt` tetap bisa dibaca (`24552011358`) walaupun container yang menulisnya (`w-k6`) sudah dihapus duluan. Lalu `attacker` berhasil `wget` halaman nginx dari `target` dan dapat halaman "Welcome to nginx!" lengkap.
+Hasil:
+```
+vol-k6
+w-k6
+24552011358
+
+[+] up 3/3
+ Network k6_lab          Created
+ Container k6-target-1   Started
+ Container k6-attacker-1 Started
+
+<!DOCTYPE html>
+<html>
+<head><title>Welcome to nginx!</title></head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.</p>
+</body>
+</html>
+
+[+] down 3/3
+ Container k6-attacker-1 Removed
+ Container k6-target-1   Removed
+ Network k6_lab          Removed
+```
+
+File `laporan-k6.txt` tetap bisa dibaca (`24552011358`) walaupun container yang menulisnya (`w-k6`) sudah dihapus duluan. Lalu `attacker` berhasil `wget` halaman nginx dari `target` dan mendapatkan halaman "Welcome to nginx!" lengkap.
 
 **Kesimpulan:** volume Docker bersifat persisten — datanya tetap ada walaupun container yang membuatnya sudah dihapus, karena volume berjalan terpisah dari siklus hidup container. Selain itu, dua container dalam satu compose dapat saling berkomunikasi hanya dengan memanggil nama service-nya, karena Docker menyediakan DNS internal untuk itu.
 
