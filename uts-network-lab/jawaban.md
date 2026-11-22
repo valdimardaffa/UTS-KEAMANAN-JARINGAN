@@ -23,7 +23,7 @@ docker compose -p k6 -f b/b1-compose/docker-compose.yml down -v
 
 Hasil: file `laporan-k6.txt` tetap bisa dibaca (`24552011358`) walaupun container yang menulisnya (`w-k6`) sudah dihapus duluan. Lalu `attacker` berhasil `wget` halaman nginx dari `target` dan dapat halaman "Welcome to nginx!" lengkap.
 
-**Kesimpulan:** volume Docker itu persisten — datanya nggak ikut hilang walau containernya dihapus, karena volume hidup terpisah dari container. Dan dua container yang satu compose bisa saling panggil pakai nama service-nya langsung (Docker punya DNS internal sendiri).
+**Kesimpulan:** volume Docker bersifat persisten — datanya tetap ada walaupun container yang membuatnya sudah dihapus, karena volume berjalan terpisah dari siklus hidup container. Selain itu, dua container dalam satu compose dapat saling berkomunikasi hanya dengan memanggil nama service-nya, karena Docker menyediakan DNS internal untuk itu.
 
 ---
 
@@ -49,7 +49,7 @@ notBefore=Nov 21 15:02:46 2026 GMT
 notAfter=Dec 21 15:02:46 2026 GMT
 ```
 
-**Kesimpulan:** karena hash sebelum-sesudah sama, berarti AES-256 berhasil enkripsi lalu dekripsi lagi tanpa merusak isinya sama sekali. Sertifikatnya self-signed — kelihatan dari `subject` dan `issuer` yang sama persis, artinya sertifikat ini nandatangani dirinya sendiri, bukan oleh CA yang sudah dipercaya browser/OS. Bedanya sama sertifikat CA-signed: kalau CA-signed, yang nandatangani itu otoritas yang memang sudah terdaftar dan dipercaya, jadi rantai kepercayaannya bisa dicek pihak lain. Self-signed nggak punya itu, makanya browser suka kasih warning.
+**Kesimpulan:** karena hash sebelum dan sesudah identik, berarti AES-256 berhasil mengenkripsi dan mendekripsi data tanpa merusak isinya sama sekali. Sertifikat yang dihasilkan bersifat self-signed, terlihat dari `subject` dan `issuer` yang sama persis — artinya sertifikat ini ditandatangani oleh dirinya sendiri, bukan oleh CA yang sudah dipercaya oleh browser/OS. Bedanya dengan sertifikat CA-signed: sertifikat CA-signed ditandatangani oleh otoritas yang sudah terdaftar dan dipercaya, sehingga rantai kepercayaannya dapat diverifikasi pihak lain. Sertifikat self-signed tidak memiliki hal tersebut, sehingga browser biasanya menampilkan peringatan.
 
 ---
 
@@ -83,9 +83,9 @@ docker exec korban-k6 cat /proc/net/arp
 172.19.0.4   56:65:56:28:4b:8a
 ```
 
-**Kesimpulan:** ini bukti ARP spoofing berhasil. Awalnya korban tahu MAC asli gateway (`8a:16...`), tapi setelah `arpspoof` jalan, entry-nya berubah jadi MAC milik `penyerang-k6` (`56:65...`). Jadi korban sekarang mengira penyerang itu gateway — semua trafik yang harusnya ke gateway malah lewat penyerang dulu (ini yang disebut man-in-the-middle).
+**Kesimpulan:** ini membuktikan ARP spoofing berhasil. Sebelumnya korban mengenali MAC asli gateway (`8a:16...`), namun setelah `arpspoof` dijalankan, entry tersebut berubah menjadi MAC milik `penyerang-k6` (`56:65...`). Artinya korban sekarang mengira penyerang adalah gateway, sehingga seluruh trafik yang seharusnya menuju gateway akan melewati penyerang terlebih dahulu (serangan man-in-the-middle).
 
-**Mitigasi:** pakai ARP statis di host penting (`arp -s <ip-gateway> <mac-asli>`) supaya ARP table-nya nggak bisa diubah sembarangan sama paket ARP palsu. Bisa juga pakai Dynamic ARP Inspection di switch, atau tools pemantau kayak arpwatch.
+**Mitigasi:** menggunakan ARP statis pada host penting (`arp -s <ip-gateway> <mac-asli>`) sehingga ARP table tidak dapat diubah oleh paket ARP palsu dari penyerang. Alternatif lain adalah menggunakan Dynamic ARP Inspection pada switch, atau tools pemantau seperti arpwatch.
 
 ---
 
@@ -135,7 +135,7 @@ TTL balasan: 64
 Tipe ICMP balasan: 0
 ```
 
-**Kesimpulan:** script Scapy berhasil bikin paket ICMP echo-request sendiri (langsung susun layer IP+ICMP dari Python, bukan pakai `ping` bawaan OS), dikirim dari `penyerang-k6` ke `korban-k6`, dan dapat balasan. TTL 64 itu nilai default Linux, dan tipe ICMP 0 artinya Echo Reply — jadi korban memang hidup dan merespons. Scapy enak dipakai karena bisa bikin paket custom sampai level detail, cocok buat scanning, troubleshooting, atau testing keamanan jaringan.
+**Kesimpulan:** script Scapy berhasil menyusun dan mengirim paket ICMP echo-request secara manual (menyusun langsung layer IP dan ICMP dari Python, tanpa menggunakan utilitas `ping` bawaan OS) dari `penyerang-k6` ke `korban-k6`, dan menerima balasan. TTL 64 merupakan nilai default pada Linux, dan tipe ICMP 0 menandakan Echo Reply — ini mengonfirmasi bahwa host tujuan aktif dan merespons. Scapy memungkinkan pembuatan paket secara presisi hingga level protokol, sehingga berguna untuk keperluan scanning, troubleshooting, maupun pengujian keamanan jaringan.
 
 ---
 
@@ -149,9 +149,9 @@ docker compose exec -d attacker timeout 15 hping3 -S -p 80 --flood target
 docker compose exec attacker timeout 10 tcpdump -i eth0 -nn "tcp[tcpflags] & tcp-syn != 0" -c 50
 ```
 
-`tcp_syncookies` ternyata sudah `1` (aktif) dari awal. SYN_RECV sebelum serangan = 0. Pas serangan jalan, tcpdump berhasil tangkap **1847 paket** dalam waktu singkat, dengan source port yang beda-beda tiap paket (ciri khas flood), dan target tetap balas tiap SYN dengan SYN-ACK — jadi server nggak down, cuma kebanjiran paket.
+`tcp_syncookies` ternyata sudah bernilai `1` (aktif) sejak awal. SYN_RECV sebelum serangan tercatat 0. Saat serangan berjalan, tcpdump berhasil menangkap **1847 paket** dalam waktu singkat, dengan source port yang berbeda-beda tiap paket (ciri khas flood), dan target tetap membalas setiap SYN dengan SYN-ACK — artinya server tidak down, hanya dibanjiri paket.
 
-**Kesimpulan:** meski ribuan paket SYN palsu dikirim dalam hitungan detik, SYN_RECV di target tetap rendah. Kemungkinan besar karena SYN cookies sudah aktif secara default di kernel, jadi server nggak perlu nyimpen state koneksi half-open di memori — makanya nggak gampang kehabisan resource meski dibanjiri SYN. Mitigasi tambahan yang bisa dipakai: rate-limit paket SYN per IP pakai iptables.
+**Kesimpulan:** meskipun ribuan paket SYN palsu dikirim dalam hitungan detik, SYN_RECV di sisi target tetap rendah. Kemungkinan besar hal ini disebabkan oleh SYN cookies yang sudah aktif secara default pada kernel, sehingga server tidak perlu menyimpan state koneksi half-open di memori — akibatnya server tidak mudah kehabisan resource meskipun dibanjiri SYN. Mitigasi tambahan yang dapat diterapkan adalah rate-limit paket SYN per IP menggunakan iptables.
 
 ---
 
@@ -176,7 +176,7 @@ config 3234353532303131333538.exfil.lab is 10.0.0.99
 ```
 Didecode balik, hasilnya persis NIM asli lagi: `24552011358`.
 
-**Kesimpulan:** ini contoh nyata gimana data bisa "diselundupkan" lewat query DNS biasa. Teknik ini susah diblokir firewall karena trafik DNS (port 53) hampir selalu diizinkan keluar — dianggap normal dan penting buat resolusi nama domain sehari-hari, dan firewall biasanya cuma cek port/protokol, bukan isi query-nya. Indikator buat mendeteksinya: subdomain yang panjangnya nggak wajar atau isinya karakter acak kayak hex/base32 (bukan nama domain manusiawi), dan ada banyak query berulang ke satu domain induk yang sama dalam waktu singkat.
+**Kesimpulan:** ini adalah contoh nyata bagaimana data bisa diselundupkan melalui query DNS biasa. Teknik ini sulit diblokir firewall karena trafik DNS (port 53) hampir selalu diizinkan keluar — dianggap normal dan esensial untuk resolusi nama domain sehari-hari, sementara firewall umumnya hanya memeriksa port/protokol, bukan isi dari setiap query. Indikator untuk mendeteksinya: panjang subdomain yang tidak wajar atau berupa karakter acak seperti hex/base32 (bukan nama domain yang lazim), serta volume query berulang yang tinggi ke satu domain induk yang sama dalam waktu singkat.
 
 ---
 
