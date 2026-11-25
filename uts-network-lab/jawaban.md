@@ -228,3 +228,6 @@ Didecode balik, hasilnya persis NIM asli lagi: `24552011358`.
 ## Cleanup
 
 Setelah semua tugas selesai, semua container/network/volume yang dibuat untuk Kasus 6 (`korban-k6`, `gateway-k6`, `penyerang-k6`, `lab-arp-k6`, `vol-k6`, dst.) sudah dihapus dan dicek ulang dengan `docker ps -a`, `docker network ls`, dan `docker volume ls` — semuanya bersih.
+
+
+[Lihat Laporan UTS Keamanan Jaringan (PDF)](./Laporan_UTS_Keamanan_Jaringan_Valdimar_Daffa_Prayoga_24552011358.pdf)
